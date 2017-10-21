@@ -38,6 +38,8 @@ var ambiColorAttrib;
 var diffColorAttrib;
 var specColorAttrib;
 
+var currentKey = {}; // press the key pressed
+
 // ASSIGNMENT HELPER FUNCTIONS
 
 // get the JSON file from the passed URL
@@ -93,7 +95,7 @@ function setupWebGL() {
 // read triangles in, load them into webgl buffers
 function loadTriangles(){
     var inputTriangles = getJSONFile(INPUT_TRIANGLES_URL,"triangles");
-
+    
     if (inputTriangles != String.null) {
         var whichSetVert; // index of vertex in current triangle set
         var whichSetTri; // index of triangle in current triangle set
@@ -112,7 +114,7 @@ function loadTriangles(){
         
         for (var whichSet=0; whichSet<inputTriangles.length; whichSet++) {
             vec3.set(indexOffset,vtxBufferSize,vtxBufferSize,vtxBufferSize); // update vertex start
-
+            
             //get the parameter of ambient, diffuse, and specular
             var ambiColor = inputTriangles[whichSet].material.ambient;
             var diffColor = inputTriangles[whichSet].material.diffuse;
@@ -155,13 +157,13 @@ function loadTriangles(){
         triangleVertexNormalBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER,triangleVertexNormalBuffer); // activate that buffer
         gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(vertexNormalArray),gl.STATIC_DRAW);
-
-        //send the ambient color to WebGL
+        
+        //send the ambient colors to WebGL
         triangleAmbiColorBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER,triangleAmbiColorBuffer);
         gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(triAmbiColorArray),gl.STATIC_DRAW);
         
-        //send the diffuse color to WebGL
+        //send the diffuse colors to WebGL
         triangleDiffColorBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER,triangleDiffColorBuffer);
         gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(triDiffColorArray),gl.STATIC_DRAW);
@@ -170,7 +172,7 @@ function loadTriangles(){
         triangleSpecColorBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER,triangleSpecColorBuffer);
         gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(triSpecColorArray),gl.STATIC_DRAW);
-
+        
         // send the triangle indices to webGL
         triangleBuffer = gl.createBuffer(); // init empty triangle index buffer
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, triangleBuffer); // activate that buffer
@@ -193,7 +195,7 @@ function loadEllipsoids(){
         var ellipsoidSpecColorArray = [];
         var ellipsoidOffsetArray = [];
         var start = 0;
-
+        
         //deal the ellipsoid one by one
         for(var whichSet =0; whichSet<inputEllipsoids.length;whichSet++){
             var ambiColor = inputEllipsoids[whichSet].ambient;
@@ -202,7 +204,7 @@ function loadEllipsoids(){
             var width = 100;
             var height = 100;
             var count = 0;
-
+            
             //deal one ellipsoid by the horizontal axis and vertical axis
             for (var i = 0; i <= width; i++) {
                 for (var j = 0; j <= height; j++) {
@@ -210,11 +212,11 @@ function loadEllipsoids(){
                     var x = Math.cos(j * 2 * Math.PI / height) * Math.sin(i * Math.PI / width);
                     var y = Math.cos(i * Math.PI / width);
                     var z = Math.sin(j * 2 * Math.PI / height) * Math.sin(i * Math.PI / width);
-
+                    
                     ellipsoidCoordArray.push(inputEllipsoids[whichSet].x+inputEllipsoids[whichSet].a * x);
                     ellipsoidCoordArray.push(inputEllipsoids[whichSet].y+inputEllipsoids[whichSet].b * y);
                     ellipsoidCoordArray.push(inputEllipsoids[whichSet].z+inputEllipsoids[whichSet].c * z);
-
+                    
                     var normal = [inputEllipsoids[whichSet].a * x, inputEllipsoids[whichSet].b * y, inputEllipsoids[whichSet].c * z];
                     var normalise = Math.sqrt(normal[0]*normal[0] + normal[1]*normal[1] + normal[2]*normal[2]);
                     vertexNormalArray.push(normal[0]/normalise, normal[1]/normalise, normal[2]/normalise);
@@ -222,7 +224,7 @@ function loadEllipsoids(){
                     ellipsoidAmbiColorArray.push(ambiColor[0], ambiColor[1], ambiColor[2]);
                     ellipsoidDiffColorArray.push(diffColor[0], diffColor[1], diffColor[2]);
                     ellipsoidSpecColorArray.push(specColor[0], specColor[1], specColor[2]);
-
+                    
                     count = count + 1;
                 }
             }
@@ -280,51 +282,50 @@ function loadEllipsoids(){
     } // end if ellipsoids found
 } // end load ellipsoids
 
-// setup the webGL shaders
 function setupShaders() {
-
+    
     // define fragment shader in essl using es6 template strings
     var fShaderCode = `
     
-        precision mediump float;
-        varying vec3 vColor;
-
-        void main(void) {
-            
-            //gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0); // all fragments are white
-            gl_FragColor = vec4(vColor,1.0); // all fragments are white
-        }
+    precision mediump float;
+    varying vec3 vColor;
+    
+    void main(void) {
+        
+        //gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0); // all fragments are white
+        gl_FragColor = vec4(vColor,1.0); // all fragments are white
+    }
     `;
-
+    
     // define vertex shader in essl using es6 template strings
     var vShaderCode = `
     
-        attribute vec3 vertexPosition;
-        attribute vec3 vertexNormal;
-        attribute vec3 ambiColor;
-        attribute vec3 diffColor;
-        attribute vec3 specColor;
-        attribute vec3 vertexColor;
+    attribute vec3 vertexPosition;
+    attribute vec3 vertexNormal;
+    attribute vec3 ambiColor;
+    attribute vec3 diffColor;
+    attribute vec3 specColor;
+    attribute vec3 vertexColor;
     
-        uniform mat4 uvm;
-        uniform mat4 upm;
+    uniform mat4 uvm;
+    uniform mat4 upm;
     
-        uniform vec3 lightAt;
-        uniform vec3 eyeAt;
-        varying vec3 vColor;
+    uniform vec3 lightAt;
+    uniform vec3 eyeAt;
+    varying vec3 vColor;
+    
+    void main(void) {
         
-        void main(void) {
-            
-            vec3 L = normalize(lightAt - vertexPosition);
-            vec3 V = normalize(eyeAt - vertexPosition);
-            vec3 H = normalize(L+V);
-
-            vColor = ambiColor + diffColor * max(dot(vertexNormal, L), 0.0) + specColor * pow(max(dot(vertexNormal, H), 0.0),5.0);
-            //gl_Position = vec4(vertexPosition, 1.0); // use the untransformed position
-            gl_Position = upm * uvm * vec4(vertexPosition, 1.0); // use the untransformed position
-        }
+        vec3 L = normalize(lightAt - vertexPosition);
+        vec3 V = normalize(eyeAt - vertexPosition);
+        vec3 H = normalize(L+V);
+        
+        vColor = ambiColor + diffColor * max(dot(vertexNormal, L), 0.0) + specColor * pow(max(dot(vertexNormal, H), 0.0),5.0);
+        //gl_Position = vec4(vertexPosition, 1.0); // use the untransformed position
+        gl_Position = upm * uvm * vec4(vertexPosition, 1.0); // use the untransformed position
+    }
     `;
-
+    
     try {
         // console.log("fragment shader: "+fShaderCode);
         var fShader = gl.createShader(gl.FRAGMENT_SHADER); // create frag shader
@@ -343,16 +344,16 @@ function setupShaders() {
             throw "error during vertex shader compile: " + gl.getShaderInfoLog(vShader);
             gl.deleteShader(vShader);
         } else { // no compile errors
-            var shaderProgram = gl.createProgram(); // create the single shader program
+            shaderProgram = gl.createProgram(); // create the single shader program
             gl.attachShader(shaderProgram, fShader); // put frag shader in program
             gl.attachShader(shaderProgram, vShader); // put vertex shader in program
             gl.linkProgram(shaderProgram); // link program into gl context
-
+            
             if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) { // bad program link
                 throw "error during shader program linking: " + gl.getProgramInfoLog(shaderProgram);
             } else { // no shader program link errors
                 gl.useProgram(shaderProgram); // activate shader program (frag and vert)
-                
+
                 vertexPositionAttrib = gl.getAttribLocation(shaderProgram, "vertexPosition"); // get pointer to vertex shader input
                 gl.enableVertexAttribArray(vertexPositionAttrib); // input to shader from array
                 
@@ -361,10 +362,10 @@ function setupShaders() {
                 
                 ambiColorAttrib = gl.getAttribLocation(shaderProgram, "ambiColor");
                 gl.enableVertexAttribArray(ambiColorAttrib);
-                
+
                 diffColorAttrib = gl.getAttribLocation(shaderProgram, "diffColor");
                 gl.enableVertexAttribArray(diffColorAttrib);
-                
+
                 specColorAttrib = gl.getAttribLocation(shaderProgram, "specColor");
                 gl.enableVertexAttribArray(specColorAttrib);
                 
@@ -376,10 +377,14 @@ function setupShaders() {
                 
                 mat4.perspective(pm, Math.PI/2, 1, 0.5, 1.5);
                 shaderProgram.pmUniform = gl.getUniformLocation(shaderProgram, "upm");
-                gl.uniformMatrix4fv(shaderProgram.pmUniform, false, pm);
                 
                 mat4.lookAt(vm, eyeAt, lookAt, viewUp);
                 shaderProgram.vmUniform = gl.getUniformLocation(shaderProgram, "uvm");
+                
+                var translation = vec3.create();//**+**
+                vec3.set(translation, 0.25, 0, 0);
+                
+                gl.uniformMatrix4fv(shaderProgram.pmUniform, false, pm);
                 gl.uniformMatrix4fv(shaderProgram.vmUniform, false, vm);
             } // end if no shader program link errors
         } // end if no compile errors
@@ -441,6 +446,78 @@ function renderTrianglesEllipsoids(){
     gl.drawElements(gl.TRIANGLES,ellipsoidBuffer.numItems,gl.UNSIGNED_SHORT,0); // render
 } // end render triangles and ellipsoids
 
+function reRenderByKey(){
+    
+    requestAnimationFrame(reRenderByKey);
+    
+    if(currentKey[65]){//a
+        vec3.add(eyeAt, eyeAt, vec3.fromValues(0.01,0,0));
+        vec3.add(lookAt, lookAt, vec3.fromValues(0.01,0,0));
+        mat4.lookAt(vm, eyeAt, lookAt, viewUp);
+    }
+    if(currentKey[68]){//d
+        vec3.add(eyeAt, eyeAt, vec3.fromValues(-0.01,0,0));
+        vec3.add(lookAt, lookAt, vec3.fromValues(-0.01,0,0));
+        mat4.lookAt(vm, eyeAt, lookAt, viewUp);
+    }
+    if(currentKey[87]){//w
+        var translation = vec3.create();
+        vec3.set(translation, 0.0, 0.0, 0.01);
+        mat4.translate(vm, vm, translation);
+    }
+    if(currentKey[83]){//s
+        var translation = vec3.create();
+        vec3.set(translation, 0.0, 0.0, -0.01);
+        mat4.translate(vm, vm, translation);
+    }
+    if(currentKey[81]){//q
+        vec3.add(eyeAt, eyeAt, vec3.fromValues(0.0,0.01,0));
+        vec3.add(lookAt, lookAt, vec3.fromValues(0.0,0.01,0));
+        mat4.lookAt(vm, eyeAt, lookAt, viewUp);
+    }
+    if(currentKey[69]){//e
+        vec3.add(eyeAt, eyeAt, vec3.fromValues(0.0,-0.01,0));
+        vec3.add(lookAt, lookAt, vec3.fromValues(0.0,-0.01,0));
+        mat4.lookAt(vm, eyeAt, lookAt, viewUp);
+    }
+    
+    if(currentKey[16] && currentKey[65]){//A
+        vec3.rotateY(lookAt, lookAt, eyeAt, 0.01);
+        mat4.lookAt(vm, eyeAt, lookAt, viewUp);
+    }
+    if(currentKey[16] && currentKey[68]){//D
+        vec3.rotateY(lookAt, lookAt, eyeAt, -0.01);
+        mat4.lookAt(vm, eyeAt, lookAt, viewUp);
+    }
+    if(currentKey[16] && currentKey[87]){//W
+        vec3.rotateX(lookAt, lookAt, eyeAt, -0.01);
+        mat4.lookAt(vm, eyeAt, lookAt, viewUp);
+    }
+    if(currentKey[16] && currentKey[83]){//S
+        vec3.rotateX(lookAt, lookAt, eyeAt, 0.01);
+        mat4.lookAt(vm, eyeAt, lookAt, viewUp);
+    }
+    if(currentKey[16] && currentKey[81]){//Q
+        vec3.rotateZ(viewUp, viewUp, eyeAt, -0.01);
+        mat4.lookAt(vm, eyeAt, lookAt, viewUp);
+    }
+    if(currentKey[16] && currentKey[69]){//E
+        vec3.rotateZ(viewUp, viewUp, eyeAt, 0.01);
+        mat4.lookAt(vm, eyeAt, lookAt, viewUp);
+    }
+
+    gl.uniformMatrix4fv(shaderProgram.pmUniform, false, pm);
+    gl.uniformMatrix4fv(shaderProgram.vmUniform, false, vm);
+    renderTrianglesEllipsoids();
+}
+
+function handleKeyDown(){
+    currentKey[event.keyCode] = true;
+}
+
+function handleKeyUp() {
+    currentKey[event.keyCode] = false;
+}
 
 /* MAIN -- HERE is where execution begins after window load */
 
@@ -450,6 +527,8 @@ function main() {
     loadTriangles(); // load in the triangles from tri file
     loadEllipsoids(); // load in the ellipsoids from ellip file
     setupShaders(); // setup the webGL shaders
-    renderTrianglesEllipsoids(); // draw the triangles using webGL
     
+    document.onkeydown = handleKeyDown;
+    document.onkeyup = handleKeyUp;
+    reRenderByKey();
 } // end main
